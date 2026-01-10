@@ -14,6 +14,7 @@ dependencies: [
 - `MCPKit` - Full bundle (Core + Tools)
 - `Core` - MCP infrastructure only
 - `Tools` - Predefined tools only
+- `AnyLanguageModelBridge` - Integration with [AnyLanguageModel](https://github.com/pgorzelany/AnyLanguageModel)
 
 ## Quick Start
 
@@ -59,6 +60,20 @@ let local = try await manager.startLocalServer {
         return "Result"
     }
 }
+```
+
+## AnyLanguageModel Integration
+
+> Only use this module if your app uses [AnyLanguageModel](https://github.com/pgorzelany/AnyLanguageModel) for LLM inference.
+
+```swift
+import AnyLanguageModelBridge
+
+// MCPTool now conforms to AnyLanguageModel.Tool
+let session = LanguageModelSession(
+    model: AnthropicLanguageModel(apiKey: key),
+    tools: manager.tools
+)
 ```
 
 ## SwiftUI Integration

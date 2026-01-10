@@ -1,0 +1,158 @@
+# MCPKit
+
+> Swift library for integrating MCP (Model Context Protocol) tools into iOS/macOS apps. Host your app's functions as MCP tools for AI clients or connect to remote MCP servers.
+
+MCPKit wraps the official MCP Swift SDK to simplify two use cases:
+1. **Host MCP tools** - Register app functions as tools that AI clients (Claude Desktop, ChatGPT) can discover and call
+2. **Connect to remote MCP servers** - Use 3rd party MCP tools (GitHub, Slack, Filesystem)
+
+## Architecture
+
+```
+MCPManager (central orchestrator)
+├── localServer: MCPLocalServer  ← Hosts tools for AI clients
+├── connections: [MCPConnection] ← Remote MCP server connections
+└── tools: [MCPTool]             ← All available tools
+```
+
+## Installation
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/user/MCPKit.git", from: "1.0.0")
+]
+```
+
+**Targets:**
+- `MCPKit` - Full bundle (Core + Tools)
+- `Core` - MCP infrastructure only
+- `Tools` - Predefined tools only
+- `AnyLanguageModelBridge` - Integration with AnyLanguageModel (only use if your app uses AnyLanguageModel for LLM inference)
+
+## Quick Start
+
+```swift
+import MCPKit
+
+let manager = MCPManager()
+
+// Start local server with tools
+let local = try await manager.startLocalServer {
+    ClipboardTool.tools
+    CalendarTool.tools
+}
+try await manager.connect(local)
+
+// Get tools for AI (prefixed names like mcp_local_clipboard_read)
+let tools = manager.enabledTools
+
+// Execute tool call from AI response
+let result = try await manager.callTool("mcp_local_clipboard_read")
+```
+
+## Creating Custom Tools
+
+### Simple tool (no arguments)
+```swift
+MCPTool(name: "ping", description: "Ping the app") { _ in
+    return "pong"
+}
+```
+
+### Tool with arguments
+```swift
+MCPTool(
+    name: "play_music",
+    description: "Play a song",
+    inputSchema: .object([
+        "type": .string("object"),
+        "properties": .object([
+            "song": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("song")])
+    ])
+) { args in
+    let song = args?["song"]?.stringValue ?? "Unknown"
+    return "Now playing: \(song)"
+}
+```
+
+### Throwing tool
+```swift
+MCPTool(
+    name: "fetch_data",
+    description: "Fetch data from API",
+    throwingHandler: { args in
+        return try await api.fetchData()
+    }
+)
+```
+
+## AnyLanguageModel Integration
+
+Only use if your app uses AnyLanguageModel for LLM inference:
+
+```swift
+import AnyLanguageModelBridge
+
+// MCPTool conforms to AnyLanguageModel.Tool
+let session = LanguageModelSession(
+    model: AnthropicLanguageModel(apiKey: key),
+    tools: manager.tools
+)
+```
+
+## Predefined Tools
+
+| Tool | Operations |
+|------|------------|
+| ClipboardTool | clipboard_read, clipboard_write |
+| NotificationTool | notification_schedule, notification_request_permission |
+| URLOpenerTool | url_open |
+| CalendarTool | calendar_list_events, calendar_create_event |
+
+## Key Types
+
+- `MCPManager`: Central manager for local tools and remote connections
+- `MCPTool`: Struct wrapping MCP.Tool with execute handler
+- `MCPLocalServer`: Hosts your tools for external AI clients
+- `MCPConnection`: Client connection to remote MCP servers
+- `MCPToolProvider`: Protocol for grouping related tools
+- `MCPToolsBuilder`: Result builder for declarative tool registration
+
+## Tool Naming Convention
+
+Tools are prefixed when accessed via MCPManager:
+- Server-side: `clipboard_read`
+- Client-side: `mcp_local_clipboard_read` (format: `mcp_{server}_{toolName}`)
+
+## Requirements
+
+- iOS 17.0+ / macOS 14.0+
+- Swift 6.1+
+
+## Core Sources
+
+- [MCPManager.swift](Sources/Core/MCPManager.swift): Central orchestrator for MCP functionality
+- [MCPTool.swift](Sources/Core/Models/MCPTool.swift): Tool definition with execute handler
+- [MCPLocalServer.swift](Sources/Core/MCPLocalServer.swift): Hosts tools for AI clients
+- [MCPConnection.swift](Sources/Core/MCPConnection.swift): Remote MCP server connection
+- [MCPToolProvider.swift](Sources/Core/Protocols/MCPToolProvider.swift): Protocol for tool providers
+- [MCPToolsBuilder.swift](Sources/Core/Protocols/MCPToolsBuilder.swift): Result builder for tools
+
+## Predefined Tool Sources
+
+- [ClipboardTool.swift](Sources/Tools/ClipboardTool.swift): System clipboard operations
+- [CalendarTool.swift](Sources/Tools/CalendarTool.swift): Calendar event operations
+- [NotificationTool.swift](Sources/Tools/NotificationTool.swift): Local notification operations
+- [URLOpenerTool.swift](Sources/Tools/URLOpenerTool.swift): URL opening operations
+
+## AnyLanguageModel Bridge Sources
+
+- [MCPTool+Tool.swift](Sources/AnyLanguageModelBridge/MCPTool+Tool.swift): MCPTool conformance to AnyLanguageModel.Tool
+- [SchemaConverter.swift](Sources/AnyLanguageModelBridge/SchemaConverter.swift): MCP schema to GenerationSchema conversion
+- [ValueConverter.swift](Sources/AnyLanguageModelBridge/ValueConverter.swift): Value type conversion between MCP and AnyLanguageModel
+
+## Optional
+
+- [Tools.swift](Sources/Tools/Tools.swift): Convenience accessor for all predefined tools
