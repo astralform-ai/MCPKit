@@ -4,29 +4,42 @@
 import PackageDescription
 
 let package = Package(
-    name: "astroform-mcp",
+    name: "MCPKit",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
+        // Core MCP functionality - tool registration, server hosting, client connections
         .library(
-            name: "astroform-mcp",
-            targets: ["MCPCore"]),
+            name: "Core",
+            targets: ["Core"]
+        ),
+        // Predefined tools - clipboard, notifications, URL opener, calendar
+        .library(
+            name: "Tools",
+            targets: ["Tools"]
+        ),
+        // Full bundle - both Core and Tools
+        .library(
+            name: "MCPKit",
+            targets: ["Core", "Tools"]
+        ),
     ],
     dependencies: [
-        .package(url: "https://github.com/atom2ueki/swift-sdk.git", branch: "PassthroughTransport")
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.10.0")
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
+        // Core MCP functionality
         .target(
-            name: "MCPCore",
+            name: "Core",
             dependencies: [
                 .product(name: "MCP", package: "swift-sdk")
             ],
+            path: "Sources/Core"
         ),
-        .testTarget(
-            name: "MCPCoreTests",
-            dependencies: ["MCPCore"]
+        // Predefined tools
+        .target(
+            name: "Tools",
+            dependencies: ["Core"],
+            path: "Sources/Tools"
         ),
     ]
 )

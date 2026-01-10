@@ -4,58 +4,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is `astroform-mcp`, a Swift package that provides an MCP (Model Context Protocol) implementation for iOS apps. The package enables iOS applications to connect to and manage MCP servers, facilitating tool execution and server communication.
+**astroform-mcp** is a Swift library that wraps the official MCP (Model Context Protocol) Swift SDK to make it easy for iOS/macOS apps to:
+
+1. **Host MCP tools** - Register your app's functions as MCP tools that AI clients (Claude Desktop, ChatGPT, etc.) can discover and call
+2. **Connect to remote MCP servers** - Use 3rd party MCP tools (GitHub, Slack, Filesystem, etc.)
+
+## Build Commands
+
+```bash
+swift build          # Build the library
+swift test           # Run tests
+swift package clean  # Clean build artifacts
+```
 
 ## Architecture
 
-### Core Components
-
-- **MCPCore**: Main module containing all MCP functionality
-- **MCPManager**: Observable class that manages multiple MCP connections and tracks enabled tools
-- **MCPConnection**: Handles individual MCP server connections with state management (idle/connecting/connected)
-- **MCPLocalServer**: Local MCP server implementation that can host tools locally
-- **MCPTool Protocol**: Defines the interface for MCP tools that can be executed
-
-### Key Design Patterns
-
-- Uses Swift's `@Observable` macro for reactive state management
-- Protocol-oriented design with `MCPTool` for extensible tool system
-- Async/await throughout for proper concurrency handling
-- Comprehensive error handling with custom `MCPConnectionError` types
-
-### Dependencies
-
-- **MCP Swift SDK**: Uses a custom fork from `https://github.com/atom2ueki/swift-sdk.git` (PassthroughTransport branch)
-- **Swift Logging**: For structured logging throughout the system
-- **Foundation**: Core Swift framework dependencies
-
-## Development Commands
-
-### Building
-```bash
-swift build
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Your iOS/macOS App                                             │
+│                                                                 │
+│  MCPManager (central orchestrator)                              │
+│  ├── localTools: [MCPTool]       ← Your app's functions         │
+│  ├── localServer: MCPLocalServer ← Hosts tools for AI clients   │
+│  └── connections: [MCPConnection]← Remote MCP servers           │
+│                                                                 │
+│         │                                    │                  │
+│         ▼                                    ▼                  │
+│  External AI Client              Remote MCP Servers             │
+│  (Claude, ChatGPT)               (GitHub, Slack, etc.)          │
+│  calls your tools                you call their tools           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Testing
-```bash
-swift test
+## Key Components
+
+| File | Purpose |
+|------|---------|
+| `MCPTool.swift` | Struct wrapping `MCP.Tool` with an execute handler |
+| `MCPLocalServer.swift` | Hosts your tools for external AI clients |
+| `MCPConnection.swift` | Client connection to remote MCP servers |
+| `MCPManager.swift` | Central manager for local tools + remote connections |
+
+## Usage Examples
+
+### Simple tool (no arguments)
+```swift
+let ping = MCPTool(name: "ping", description: "Ping the app") { _ in
+    return "pong"
+}
 ```
 
-### Package Management
-```bash
-swift package resolve          # Resolve dependencies
-swift package update           # Update dependencies
-swift package clean            # Clean build artifacts
+### Tool with arguments
+```swift
+let playMusic = MCPTool(
+    name: "play_music",
+    description: "Play a song",
+    inputSchema: .object([
+        "type": .string("object"),
+        "properties": .object([
+            "song": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("song")])
+    ])
+) { args in
+    let song = args?["song"]?.stringValue ?? "Unknown"
+    return "Now playing: \(song)"
+}
 ```
 
-### Platform Requirements
-- iOS 17.0+ (as specified in Package.swift)
-- Swift 6.1+ (swift-tools-version)
+## Key Design Decisions
 
-## Key Files to Understand
+- **`MCPTool` is a struct** - wraps `MCP.Tool` + execute closure, not a protocol
+- **`inputSchema` defaults to `[:]`** - empty object for no-arg tools (per MCP SDK convention)
+- **`client.callTool` returns tuple** - MCP SDK returns `(content, isError)`, not `CallTool.Result`
+- **Transport injected by user** - library doesn't create transports; user provides stdio/HTTP/etc.
 
-- `Sources/MCPCore/MCPManager.swift`: Entry point for managing MCP connections
-- `Sources/MCPCore/MCPConnection.swift`: Core connection logic and state management
-- `Sources/MCPCore/MCPLocalServer.swift`: Local server implementation
-- `Sources/MCPCore/Protocols/MCPTool.swift`: Tool protocol definition
-- `Package.swift`: Package configuration and dependencies
+## Dependencies
+
+- **MCP Swift SDK** (`modelcontextprotocol/swift-sdk` v0.10.0+)
+- **swift-log** for logging
+
+## Platform Requirements
+
+- iOS 17.0+ / macOS 14.0+
+- Swift 6.1+
