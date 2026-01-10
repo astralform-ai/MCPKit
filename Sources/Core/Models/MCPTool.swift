@@ -72,7 +72,7 @@ public struct MCPTool: Sendable, Identifiable {
     public var name: String { tool.name }
 
     /// The tool's description.
-    public var description: String? { tool.description }
+    public var description: String { tool.description ?? "" }
 
     /// The tool's input schema (JSON Schema format).
     public var inputSchema: MCP.Value { tool.inputSchema }
@@ -187,7 +187,7 @@ public struct MCPTool: Sendable, Identifiable {
         self.handler = nil
     }
 
-    func execute(arguments: [String: MCP.Value]?) async -> CallTool.Result {
+    public func execute(arguments: [String: MCP.Value]?) async -> CallTool.Result {
         guard let handler else {
             return CallTool.Result(
                 content: [.text("Error: No handler for this tool.")],

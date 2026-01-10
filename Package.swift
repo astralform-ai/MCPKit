@@ -22,9 +22,17 @@ let package = Package(
             name: "MCPKit",
             targets: ["Core", "Tools"]
         ),
+        // AnyLanguageModel bridge - MCPTool conforms to AnyLanguageModel.Tool
+        // Only import this if you use AnyLanguageModel in your project
+        .library(
+            name: "MCPKitAnyLanguageModel",
+            targets: ["MCPKitAnyLanguageModel"]
+        ),
     ],
     dependencies: [
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.10.0")
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.10.0"),
+        // Only fetched when MCPKitAnyLanguageModel is used
+        .package(url: "https://github.com/mattt/AnyLanguageModel", from: "0.5.0"),
     ],
     targets: [
         // Core MCP functionality
@@ -40,6 +48,16 @@ let package = Package(
             name: "Tools",
             dependencies: ["Core"],
             path: "Sources/Tools"
+        ),
+        // AnyLanguageModel bridge - adds Tool conformance to MCPTool
+        // AnyLanguageModel is only fetched when this target is used
+        .target(
+            name: "MCPKitAnyLanguageModel",
+            dependencies: [
+                "Core",
+                .product(name: "AnyLanguageModel", package: "AnyLanguageModel")
+            ],
+            path: "Sources/AnyLanguageModelBridge"
         ),
     ]
 )
