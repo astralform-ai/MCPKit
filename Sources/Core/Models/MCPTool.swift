@@ -51,8 +51,36 @@ import MCP
 public struct MCPTool: Sendable, Identifiable {
     /// A unique identifier for this tool.
     ///
-    /// - Server side: Just the tool name (e.g., `"clipboard_read"`)
-    /// - Client side: `"mcp_{server}_{toolName}"` (e.g., `"mcp_local_clipboard_read"`)
+    /// ## Format
+    /// Always prefixed: `"mcp_{serverName}_{toolName}"`
+    ///
+    /// Examples:
+    /// - `"mcp_local_clipboard_read"` - Local server tool
+    /// - `"mcp_github_list_repos"` - GitHub MCP server tool
+    /// - `"mcp_anythoughts_todo_add"` - App-specific local tool
+    ///
+    /// ## Usage
+    /// - **SwiftUI**: Used by `Identifiable` for `ForEach`, `List`, etc.
+    /// - **Routing**: `MCPManager.callTool()` parses prefix to route to correct connection
+    /// - **Filtering**: `enabledMcp` set uses IDs to filter which tools are active
+    ///
+    /// ## Important: `id` vs `name`
+    /// - `id` is for **identification and routing** (MCPKit layer)
+    /// - `name` is for **MCP protocol** (transmitted to/from servers)
+    /// - MCP protocol does NOT transmit `id`, only `name`
+    ///
+    /// ## Flow
+    /// ```
+    /// Server-side:  id = "mcp_appname_todo_add", name = "todo_add"
+    ///                         ↓ MCP Protocol (only name transmitted)
+    /// Client-side:  id = "mcp_local_todo_add", name = "todo_add"
+    ///                         ↓ Sent to backend
+    /// Backend:      receives tool with name = "mcp_local_todo_add" (from id)
+    ///                         ↓ LLM calls tool
+    /// MCPManager:   parses "mcp_local_todo_add" → server="local", tool="todo_add"
+    ///                         ↓ Routes to connection
+    /// MCP Protocol: calls with name = "todo_add"
+    /// ```
     public let id: String
 
     /// The underlying MCP tool definition containing name, description, and input schema.

@@ -46,14 +46,20 @@ enum SchemaConverter {
 
     // MARK: - Private Helpers
 
-    private static func makeEmptySchema() -> GenerationSchema {
+    /// Pre-computed empty schema to avoid force unwraps at runtime.
+    /// This is safe because an empty object schema construction cannot fail.
+    private static let emptySchema: GenerationSchema = {
         let emptyRoot = DynamicGenerationSchema(
             name: defaultSchemaName,
             description: nil,
             properties: []
         )
-        // Safe: empty schema construction cannot fail
+        // swiftlint:disable:next force_try
         return try! GenerationSchema(root: emptyRoot, dependencies: [])
+    }()
+
+    private static func makeEmptySchema() -> GenerationSchema {
+        emptySchema
     }
 
     /// Recursively converts MCP.Value to DynamicGenerationSchema.

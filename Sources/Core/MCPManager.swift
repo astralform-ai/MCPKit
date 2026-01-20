@@ -46,8 +46,12 @@ import SwiftUI
 /// // 4. Call any tool (routes automatically)
 /// let result = try await manager.callTool("mcp_github_create_issue", arguments: [...])
 /// ```
+///
+/// - Note: This class is `@MainActor` isolated to ensure UI-bound state (`connections`, `localServer`)
+///   is always accessed from the main thread, making it safe to use with SwiftUI.
 @Observable
-public final class MCPManager: @unchecked Sendable {
+@MainActor
+public final class MCPManager {
     private let logger = Logger(label: "mcpkit.manager")
 
     /// The local MCP server instance, if started.
@@ -89,7 +93,7 @@ public final class MCPManager: @unchecked Sendable {
 
         // Create and start the server
         let server = try MCPLocalServer(transport: serverTransport)
-        server.registerTools(tools)
+        await server.registerTools(tools)
         try await server.start()
         localServer = server
 

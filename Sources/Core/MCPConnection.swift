@@ -52,8 +52,12 @@ public enum MCPConnectionError: Error, LocalizedError {
 /// A client connection to an MCP server.
 ///
 /// This class is managed by `MCPManager`. Use `MCPManager.connect()` to add connections.
+///
+/// - Note: This class is `@MainActor` isolated to ensure UI-bound state (`state`, `tools`)
+///   is always accessed from the main thread, making it safe to use with SwiftUI.
 @Observable
-public final class MCPConnection: @unchecked Sendable {
+@MainActor
+public final class MCPConnection {
     /// A unique identifier for this connection.
     public let id: UUID
 
@@ -97,11 +101,15 @@ public final class MCPConnection: @unchecked Sendable {
     ///     - `HTTPClientTransport` for remote HTTP servers
     ///     - `StdioTransport` for subprocess servers
     public init(name: String, transport: MCP.Transport) throws {
-        guard let appName = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String else {
-            throw MCPConnectionError.missingBundleInfo("CFBundleDisplayName")
+        // Try CFBundleDisplayName first, then fall back to CFBundleName
+        guard let appName = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
+            ?? Bundle.main.infoDictionary?["CFBundleName"] as? String else {
+            throw MCPConnectionError.missingBundleInfo("CFBundleDisplayName or CFBundleName")
         }
-        guard let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String else {
-            throw MCPConnectionError.missingBundleInfo("CFBundleShortVersionString")
+        // Try CFBundleShortVersionString first, then fall back to CFBundleVersion
+        guard let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String else {
+            throw MCPConnectionError.missingBundleInfo("CFBundleShortVersionString or CFBundleVersion")
         }
 
         self.id = UUID()
@@ -145,20 +153,28 @@ public final class MCPConnection: @unchecked Sendable {
 
             // Subscribe to tool list changes
             if result.capabilities.tools?.listChanged == true {
+                // Capture connection name for use in notification handler
+                let connectionName = self.name
                 await client.onNotification(ToolListChangedNotification.self) { [weak self] _ in
                     guard let self else { return }
-                    if let newTools = try? await self.fetchAllTools() {
-                        // Preserve enabled state when refreshing
-                        let disabledNames = Set(self.tools.filter { !$0.isEnabled }.map { $0.name })
-                        self.tools = newTools.map { tool in
-                            MCPTool(
-                                tool: tool,
-                                connectionName: self.name,
-                                isEnabled: !disabledNames.contains(tool.name)
-                            )
+                    do {
+                        let newTools = try await self.fetchAllTools()
+                        // Switch to MainActor for state mutation
+                        await MainActor.run {
+                            // Preserve enabled state when refreshing
+                            let disabledNames = Set(self.tools.filter { !$0.isEnabled }.map { $0.name })
+                            self.tools = newTools.map { tool in
+                                MCPTool(
+                                    tool: tool,
+                                    connectionName: connectionName,
+                                    isEnabled: !disabledNames.contains(tool.name)
+                                )
+                            }
+                            self.logger.info("Tool list updated: \(self.tools.count) tools")
                         }
+                    } catch {
+                        self.logger.error("Failed to refresh tools: \(error.localizedDescription)")
                     }
-                    self.logger.info("Tool list updated: \(self.tools.count) tools")
                 }
             }
 
@@ -178,7 +194,7 @@ public final class MCPConnection: @unchecked Sendable {
         logger.info("Disconnected from \(name)")
     }
 
-    func setEnabled(_ enabled: Bool, for toolId: String) {
+    public func setEnabled(_ enabled: Bool, for toolId: String) {
         if let index = tools.firstIndex(where: { $0.id == toolId }) {
             tools[index].isEnabled = enabled
         }
@@ -200,7 +216,7 @@ public final class MCPConnection: @unchecked Sendable {
     }
 
     /// Fetches all tools from the server with pagination support.
-    private func fetchAllTools() async throws -> [MCP.Tool] {
+    nonisolated private func fetchAllTools() async throws -> [MCP.Tool] {
         var allTools: [MCP.Tool] = []
         var cursor: String? = nil
 

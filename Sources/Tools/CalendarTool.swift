@@ -56,7 +56,7 @@ public enum CalendarTool: MCPToolProvider {
     public static var createEventTool: MCPTool {
         MCPTool(
             name: "calendar_create_event",
-            description: "Create a new calendar event",
+            description: "Create a new calendar event. IMPORTANT: Always confirm the event details (title, date/time, and duration) with the user before creating the event.",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([

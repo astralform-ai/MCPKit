@@ -24,39 +24,71 @@ public enum MCPLocalServerError: Error, LocalizedError {
 
 /// An MCP server that hosts your app's tools.
 ///
-/// This class is managed internally by `MCPManager`. Use `MCPManager.startLocalServer` to create one.
-public final class MCPLocalServer: Sendable {
+/// This actor is managed internally by `MCPManager`. Use `MCPManager.startLocalServer` to create one.
+///
+/// - Note: This is an actor to ensure thread-safe access to mutable state (tools, server).
+public actor MCPLocalServer {
     private let transport: MCP.Transport
-    private let tools: LockedValue<[MCPTool]>
+    private var tools: [MCPTool] = []
     private let logger: Logging.Logger
     private let serverName: String
     private let serverVersion: String
-    private let server: LockedValue<MCP.Server?>
+    private var server: MCP.Server?
 
     init(transport: MCP.Transport) throws {
-        guard let name = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String else {
-            throw MCPLocalServerError.missingBundleInfo("CFBundleDisplayName")
+        // Try CFBundleDisplayName first, then fall back to CFBundleName
+        guard let name = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
+            ?? Bundle.main.infoDictionary?["CFBundleName"] as? String else {
+            throw MCPLocalServerError.missingBundleInfo("CFBundleDisplayName or CFBundleName")
         }
-        guard let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String else {
-            throw MCPLocalServerError.missingBundleInfo("CFBundleShortVersionString")
+        // Try CFBundleShortVersionString first, then fall back to CFBundleVersion
+        guard let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String else {
+            throw MCPLocalServerError.missingBundleInfo("CFBundleShortVersionString or CFBundleVersion")
         }
         self.serverName = name
         self.serverVersion = version
         self.transport = transport
-        self.tools = LockedValue([])
         self.logger = Logger(label: "mcpkit.local.server")
-        self.server = LockedValue(nil)
     }
 
+    /// Registers tools with the local MCP server.
+    ///
+    /// ## Tool ID vs Name
+    /// Each `MCPTool` has both an `id` and a `name`:
+    /// - **`id`**: Used for MCPKit identification and routing (e.g., `"mcp_appname_todo_add"`)
+    /// - **`name`**: Used for MCP protocol communication (e.g., `"todo_add"`)
+    ///
+    /// ## Important
+    /// The MCP protocol only transmits `tool.name`, never `tool.id`. When clients
+    /// receive tools via MCP, they create their own `id` based on connection name.
+    /// Tool lookup in `CallTool` handler uses `tool.name`, not `tool.id`.
+    ///
+    /// ## Example
+    /// ```swift
+    /// // Server registers tool
+    /// let tool = MCPTool(name: "todo_add", description: "Add a todo")
+    /// // Internal: id = "todo_add", name = "todo_add"
+    ///
+    /// // MCP Protocol transmits only name
+    /// ListTools.Result → tools: [Tool(name: "todo_add", ...)]
+    ///
+    /// // Client creates new MCPTool with its own id
+    /// MCPTool(tool: mcpTool, connectionName: "Local")
+    /// // Internal: id = "mcp_local_todo_add", name = "todo_add"
+    /// ```
+    ///
+    /// - Parameter newTools: Array of tools to register with the server.
     func registerTools(_ newTools: [MCPTool]) {
-        tools.withLock { $0.append(contentsOf: newTools) }
+        tools.append(contentsOf: newTools)
         logger.info("Registered \(newTools.count) tools")
     }
 
     func start() async throws {
         logger.info("Starting MCP server: \(serverName) v\(serverVersion)")
 
-        let currentTools = tools.withLock { $0 }
+        // Capture tools for use in handlers (actors are re-entrant safe)
+        let currentTools = tools
         let logger = self.logger
 
         let mcpServer = MCP.Server(
@@ -104,32 +136,16 @@ public final class MCPLocalServer: Sendable {
 
         // Start the server
         try await mcpServer.start(transport: transport)
-        server.withLock { $0 = mcpServer }
+        server = mcpServer
 
         logger.info("MCP server started with \(currentTools.count) tools")
     }
 
     func stop() async {
-        if let mcpServer = server.withLock({ $0 }) {
+        if let mcpServer = server {
             await mcpServer.stop()
-            server.withLock { $0 = nil }
+            server = nil
             logger.info("MCP server stopped")
         }
-    }
-}
-
-// MARK: - Thread-safe value wrapper
-private final class LockedValue<T>: @unchecked Sendable {
-    private var value: T
-    private let lock = NSLock()
-
-    init(_ value: T) {
-        self.value = value
-    }
-
-    func withLock<R>(_ body: (inout T) -> R) -> R {
-        lock.lock()
-        defer { lock.unlock() }
-        return body(&value)
     }
 }
