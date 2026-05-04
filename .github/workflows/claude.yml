@@ -1,9 +1,5 @@
 name: Claude
 
-# Triggers and credentials only - all gating logic lives in the
-# reusable workflow at astralform-ai/.github. Edit there to change
-# behavior across the org.
-
 on:
   issue_comment:
     types: [created]
@@ -23,5 +19,18 @@ permissions:
 
 jobs:
   claude:
-    uses: astralform-ai/.github/.github/workflows/claude.yml@main
-    secrets: inherit
+    if: |
+      github.event.sender.type != 'Bot' && (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
