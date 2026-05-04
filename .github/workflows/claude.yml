@@ -11,6 +11,8 @@ on:
     types: [created]
   issues:
     types: [opened, assigned]
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   claude:
