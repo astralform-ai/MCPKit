@@ -1,4 +1,4 @@
-name: Claude Code
+name: Claude
 
 # Triggers and credentials only — all gating logic lives in the
 # reusable workflow at astralform-ai/.github. Edit there to change
@@ -16,5 +16,5 @@ on:
 
 jobs:
   claude:
-    uses: astralform-ai/.github/.github/workflows/claude-reusable.yml@main
+    uses: astralform-ai/.github/.github/workflows/claude.yml@main
     secrets: inherit
