@@ -64,9 +64,3 @@
 - name: wontfix
   description: Working as intended or out of scope. Will not be addressed.
   color: ffffff
-- name: good first issue
-  description: Well-scoped and well-documented; suitable for new contributors.
-  color: 7057ff
-- name: help wanted
-  description: Extra attention or community contribution welcome.
-  color: 008672

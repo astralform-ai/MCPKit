@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  contents: read    # required for actions/checkout on private repos
   issues: write
 
 jobs:
