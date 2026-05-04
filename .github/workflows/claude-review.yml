@@ -1,0 +1,10 @@
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  review:
+    uses: astralform-ai/.github/.github/workflows/claude-review.yml@main
+    secrets: inherit

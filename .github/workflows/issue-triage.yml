@@ -1,0 +1,10 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    uses: astralform-ai/.github/.github/workflows/issue-triage.yml@main
+    secrets: inherit

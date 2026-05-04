@@ -1,6 +1,6 @@
 name: Claude
 
-# Triggers and credentials only — all gating logic lives in the
+# Triggers and credentials only - all gating logic lives in the
 # reusable workflow at astralform-ai/.github. Edit there to change
 # behavior across the org.
 
@@ -11,8 +11,8 @@ on:
     types: [created]
   issues:
     types: [opened, assigned]
-  pull_request:
-    types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted]
 
 jobs:
   claude:
