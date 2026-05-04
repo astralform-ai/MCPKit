@@ -1,0 +1,23 @@
+name: Sync labels
+
+# Reconciles this repo's labels to match labels.yml at the root.
+# No PAT - uses default GITHUB_TOKEN (scoped to this repo).
+
+on:
+  push:
+    branches: [main]
+    paths: [labels.yml]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: micnncim/action-label-syncer@v1
+        with:
+          manifest: labels.yml
+          prune: true
