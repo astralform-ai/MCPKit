@@ -89,14 +89,16 @@ extension MCPTool: AnyLanguageModel.Tool {
     private func formatResultContent(_ content: [MCP.Tool.Content]) -> String {
         content.map { item -> String in
             switch item {
-            case .text(let text):
+            case .text(let text, _, _):
                 return text
-            case .image(data: let data, mimeType: let mimeType, metadata: _):
+            case .image(let data, let mimeType, _, _):
                 return "[Image: \(mimeType), \(data.count) characters]"
-            case .resource(uri: let uri, mimeType: _, text: _):
-                return "[Resource: \(uri)]"
-            case .audio(data: let data, mimeType: let mimeType):
+            case .audio(let data, let mimeType, _, _):
                 return "[Audio: \(mimeType), \(data.count) characters]"
+            case .resource(let resource, _, _):
+                return "[Resource: \(resource.uri)]"
+            case .resourceLink(let uri, _, _, _, _, _):
+                return "[Resource link: \(uri)]"
             }
         }.joined(separator: "\n")
     }
